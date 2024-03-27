@@ -20,6 +20,235 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
+/*
+   Implementation of "new" syntax sugar:
+
+function new(reference)
+  if type(reference) ~= "table" then
+    error "bad argument #1 to 'new' (table expected, got no value)"
+  end
+  local metatable= {}
+  local reference_metatable = reference.__metatable or {}
+  local new_instance = {}
+
+  if type(rawget(reference,"<instance metatable>")) == "table" then
+    return setmetatable({},rawget(reference,"<instance metatable>"))
+  end
+
+  for k,v in pairs(reference_metatable) do
+    metatable[k] = v
+  end
+
+  metatable.__index = reference
+
+  rawgeset(reference,"<instance metatable>",metatable)
+
+  return setmetatable(new_instance,metatable)
+end
+
+    This allows:
+
+MyClass = {
+  property = "value";
+  __metatable = {
+    __tostring =
+      function (self)
+        return "Property is: "..self.property
+      end
+    ;
+  }
+}
+
+instance = new(MyClass)
+instance.property = "another value"
+
+print(instance) -- Property is: another value
+
+*/
+
+int luaB_new(lua_State *L) {
+    const int reference = 1;
+    const int metatable = 2;
+    const int reference_metatable = 3;
+    const int new_instance = 4;
+
+    // Only pass if arg is table
+    luaL_checktype(L, reference, LUA_TTABLE);
+
+    lua_pushstring(L,"<instance metatable>");
+    lua_rawget(L, reference);
+    if (lua_istable(L, -1)) {
+        // Field does not exist?
+        lua_setmetatable(L, -2);
+
+        return 1;
+    }
+
+    lua_pop(L, 1);  // Remove nil from stack
+
+    // Our metatable
+    lua_newtable(L);
+
+    // Try put reference metatable field on to stack
+    lua_getfield(L, reference, "__metatable");
+    if (lua_isnil(L, -1)) {
+        // Field does not exist?
+        lua_pop(L, 1);  // Remove nil from stack
+        lua_newtable(L); // Create an empty table
+    }
+
+    lua_newtable(L);
+
+    lua_pushnil(L);  // Start iteration by pushing nil onto the stack
+    while (lua_next(L, reference_metatable)) {
+        // key is at index -2 and value is at index -1
+        lua_pushvalue(L, -2);  // Push the key again to keep it for the next iteration
+        lua_pushvalue(L, -2);  // Duplicate the value to leave a copy on the stack
+        lua_settable(L, metatable);  // Set the value in the new metatable
+        lua_pop(L, 1);  // Pop the value, leaving the key for the next iteration
+    }
+
+    lua_pushvalue(L, reference);
+    lua_setfield(L, metatable, "__index");
+
+
+    lua_pushliteral(L,"<instance metatable>");
+    lua_pushvalue(L, metatable);
+    lua_rawset(L, reference);
+
+    // Set metatable for new_instance
+    lua_pushvalue(L, new_instance);
+    lua_pushvalue(L, metatable);
+    lua_setmetatable(L, -2);
+
+    return 1; // Return the new_instance
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+
+/*
+   Implementation of "extends" syntax sugar:
+
+function extends(base)
+  if type(base) ~= "table" then
+    error "bad argument #1 to 'new' (table expected, got no value)"
+  end
+  return
+    function (derived)
+      local derived_metatable = derived.__metatable or {}
+      local base_metatable = base.__metatable or {}
+
+      for k,v in pairs(base_metatable) do
+        if k ~= "__name" then
+          derived_metatable[k] = v
+        end
+      end
+
+      derived_metatable.__index = base
+
+      return setmetatable(derived, derived_metatable)
+    end
+end
+
+    This allows:
+
+BaseClass = {
+  property = "value";
+  __metatable = {
+    __tostring =
+      function (self)
+        return "Property is: "..self.property
+      end
+    ;
+  }
+}
+
+DerivedClass = extends(BaseClass) {
+  another_property = "another value";
+  __metatable = {
+    __len =
+      function (self)
+        return 42
+      end
+    ;
+  }
+}
+
+instance = new(DerivedClass)
+print(instance) -- Property is: value
+print(#instance) -- 42
+print(instance.property) -- value
+print(instance.another_property) -- another value
+*/
+
+
+int luaB_extends_closure(lua_State *L) {
+    const int derived = 1;
+    const int base = 2;
+    const int derived_metatable = 3;
+    const int base_metatable = 4;
+
+    // This pushes the base from extends first parameter
+    lua_pushvalue(L, lua_upvalueindex(1));
+
+    // Check if __metatable field exists in the derived
+    lua_getfield(L, derived, "__metatable");
+    if (lua_isnil(L, -1)) {
+        // Field does not exist?
+        lua_pop(L, 1);  // Remove nil from stack
+        lua_newtable(L); // Create an empty table
+    }
+
+    // Check if __metatable field exists in the derived
+    lua_getfield(L, base, "__metatable");
+    if (lua_isnil(L, -1)) {
+        // Field does not exist?
+        lua_pop(L, 1);  // Remove nil from stack
+        lua_newtable(L); // Create an empty table
+    }
+
+    // Copy fields in base_metatable to derived_metatable except __name
+
+    lua_pushnil(L);  // Push nil to start the iteration
+    while (lua_next(L, base_metatable) != 0) {
+        // key is at index -2 and value at index -1
+        const char *key = lua_tostring(L, -2);
+        if (strcmp(key, "__name") != 0) {
+            // Copy the field from base_metatable to derived_metatable
+            lua_pushvalue(L, -2);  // Copy key
+            lua_pushvalue(L, -2);  // Copy value
+            lua_settable(L, derived_metatable);  // Set key-value pair in derived_metatable
+        }
+        // Pop the value, leaving the key for the next iteration
+        lua_pop(L, 1);
+    }
+
+    // To complete inheritance is needed to fallback fields on base
+    lua_pushvalue(L, base);
+    lua_setfield(L, derived_metatable, "__index");
+
+    // Set the metatable
+    lua_pushvalue(L,derived);
+    lua_pushvalue(L,derived_metatable);
+    lua_setmetatable(L, -2);
+
+    return 1;
+}
+
+int luaB_extends(lua_State *L) {
+    const int base = 1;                // Our first arg (local)
+    // Only pass if base is a table
+    luaL_checktype(L, base, LUA_TTABLE);
+    // Base as local
+    lua_pushvalue(L, base);
+
+    // Push the closure that does the trick
+    lua_pushcclosure(L, luaB_extends_closure, 1);
+    return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
 
 static int luaB_print (lua_State *L) {
   int n = lua_gettop(L);  /* number of arguments */
@@ -527,6 +756,9 @@ static const luaL_Reg base_funcs[] = {
   {"tostring", luaB_tostring},
   {"type", luaB_type},
   {"xpcall", luaB_xpcall},
+  /* Iasy */
+  {"new", luaB_new},
+  {"extends", luaB_extends},
   /* placeholders */
   {LUA_GNAME, NULL},
   {"_VERSION", NULL},
@@ -546,4 +778,3 @@ LUAMOD_API int luaopen_base (lua_State *L) {
   lua_setfield(L, -2, "_VERSION");
   return 1;
 }
-
