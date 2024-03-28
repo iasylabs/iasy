@@ -488,6 +488,27 @@ static int luaB_collectgarbage (lua_State *L) {
 static int luaB_type (lua_State *L) {
   int t = lua_type(L, 1);
   luaL_argcheck(L, t != LUA_TNONE, 1, "value expected");
+  const int any = 1;
+
+  if (lua_istable(L,1)) {
+    if (lua_getmetatable(L,any)) {
+      const int meta = 2;
+      const int __name = 3;
+
+      lua_pushstring(L,"__name");
+      lua_rawget(L,meta);
+
+      if (lua_type(L, 3) == LUA_TSTRING) {
+        return 1;
+      }
+
+      lua_pushstring(L, "object");
+      return 1;
+    }
+    lua_pushstring(L, "table");
+    return 1;
+  }
+
   lua_pushstring(L, lua_typename(L, t));
   return 1;
 }
