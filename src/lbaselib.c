@@ -278,6 +278,41 @@ int luaB_all(lua_State *L) {
 
 //----------------------------------------------------------------------------------------------------------------------//
 
+int luaB_none(lua_State *L) {
+    const int iterable = 1;
+
+    // Only pass if arg is table
+    luaL_checktype(L, iterable, LUA_TTABLE);
+
+    lua_len(L, iterable); // Get the length of the table
+    int n = lua_tointeger(L, -1); // Get the length
+    lua_pop(L, 1); // Pop the length from the stack
+
+    // Has elements?
+    if (n == 0) {
+        // No? So no element is false
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+
+    for (int i = 1; i <= n; ++i) {
+        const int value = -1;
+        lua_rawgeti(L, iterable, i); // Get the i-th element of the table
+        if (lua_toboolean(L, value) == 1) { // Check if the element is false
+            // Return false and the index
+            lua_pushboolean(L, 0);
+            lua_pushinteger(L, i);
+            return 2;
+        }
+        lua_pop(L, 1); // Pop the element from the stack
+    }
+
+    lua_pushboolean(L, 1); // Push true onto the stack
+    return 1; // Return true
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
 int luaB_any(lua_State *L) {
     const int iterable = 1;
 
@@ -917,6 +952,7 @@ static const luaL_Reg base_funcs[] = {
   {"new", luaB_new},
   {"extends", luaB_extends},
   {"all",luaB_all},
+  {"none",luaB_none},
   {"any",luaB_any},
   {"same",luaB_same},
   /* placeholders */
