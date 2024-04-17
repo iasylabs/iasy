@@ -352,17 +352,17 @@ int luaB_same(lua_State *L) {
         char *valueType = (char *)luaL_typename(L, value); // Get its type
 
         // If type of current element is "table", check if it has a metatable
-        if (strcmp(firstType, "table") == 0) {
+        if (strcmp(valueType, "table") == 0) {
             const int metatable = -1;
             // Get metatable of the table
             if (lua_getmetatable(L, metatable)) { 
-                firstType = "object"; // Ok, is at least an object (has a metatable)
+                valueType = "object"; // Ok, is at least an object (has a metatable)
                 if (lua_istable(L, metatable)) {
                     const int name = -1;
                     // We have a custom type here?
                     lua_getfield(L, metatable, "__name");
                     if (lua_isstring(L, name)) { 
-                        firstType = (char *)lua_tostring(L, name); // Yes, lets store the custom type
+                        valueType = (char *)lua_tostring(L, name); // Yes, lets store the custom type
                     }
                     lua_pop(L, 1); // Pop the "__name" field
                 }
@@ -370,11 +370,12 @@ int luaB_same(lua_State *L) {
             }
         }
 
-        // Compare the types
+        // Chech if types are different
         if (strcmp(valueType, firstType) != 0) {
-            lua_pushboolean(L, 0); // Types are not the same, push false
-            lua_replace(L, -2); // Replace the last pushed boolean with false
-            return 1;
+            // Return true and the index
+            lua_pushboolean(L, 0);
+            lua_pushinteger(L, i);
+            return 2;
         }
         lua_pop(L, 1); // Pop the element from the stack
     }
