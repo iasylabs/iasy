@@ -173,6 +173,34 @@ static int tlast (lua_State *L) {
 
 //----------------------------------------------------------------------------------------------------------------------//
 
+static int treverse (lua_State *L) {
+    const int iterable = 1;
+    const int result_table = 2;
+  
+    lua_newtable(L); 
+
+    // let's bypass metatable index
+    lua_len(L, iterable);
+    const int length = lua_tointeger(L, -1);
+    lua_pop(L, 1); 
+
+    for (int i = length; i >= 1; i--) {
+        const int value = -1;
+
+        // let's take the argument
+        lua_rawgeti(L, iterable, i);
+
+        lua_pushvalue(L, value);
+        lua_rawseti(L, result_table, luaL_len(L, result_table) + 1);
+
+        lua_pop(L, 1); // Clear the stack
+    }
+
+    return 1; // Return the result table
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
 static int tinsert (lua_State *L) {
   lua_Integer pos;  /* where to insert new element */
   lua_Integer e = aux_getn(L, 1, TAB_RW);
@@ -538,6 +566,7 @@ static const luaL_Reg tab_funcs[] = {
   {"filter",tfilter},
   {"first",tfirst},
   {"last",tlast},
+  {"reverse",treverse},
   {NULL, NULL}
 };
 
