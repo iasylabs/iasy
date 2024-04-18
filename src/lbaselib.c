@@ -260,6 +260,13 @@ int luaB_all(lua_State *L) {
     int n = lua_tointeger(L, -1); // Get the length
     lua_pop(L, 1); // Pop the length from the stack
 
+    // Has elements?
+    if (n == 0) {
+        // No? So put false
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+
     for (int i = 1; i <= n; ++i) {
         const int value = -1;
         lua_rawgeti(L, iterable, i); // Get the i-th element of the table
@@ -290,8 +297,8 @@ int luaB_none(lua_State *L) {
 
     // Has elements?
     if (n == 0) {
-        // No? So no element is false
-        lua_pushboolean(L, 0);
+        // No? So put true
+        lua_pushboolean(L, 1);
         return 1;
     }
 
