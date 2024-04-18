@@ -57,6 +57,45 @@ static void checktab (lua_State *L, int arg, int what) {
   }
 }
 
+//----------------------------------------------------------------------------------------------------------------------//
+
+static int tfilter (lua_State *L) {
+    const int iterable = 1;
+    const int comparator = 2;
+    const int result_table = 3;
+  
+    lua_newtable(L); 
+
+    // let's bypass metatable index
+    lua_len(L, iterable);
+    const int length = lua_tointeger(L, -1);
+    lua_pop(L, 1); 
+
+    for (int i = 1; i <= length; i++) {
+        const int value = -2;
+
+        // let's take the argument
+        lua_rawgeti(L, iterable, i);
+
+        // So we call the comparator function
+        lua_pushvalue(L, comparator);
+        lua_pushvalue(L, value);
+        lua_call(L, 1, 1);
+
+        // The comparator validates the value?
+        if (lua_toboolean(L, -1)==1) {
+            // Let's put them into result table
+            lua_pushvalue(L, value);
+            lua_rawseti(L, result_table, luaL_len(L, result_table) + 1);
+        }
+
+        lua_pop(L, 2); // Clear the stack
+    }
+
+    return 1; // Return the result table
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
 
 static int tinsert (lua_State *L) {
   lua_Integer pos;  /* where to insert new element */
@@ -419,6 +458,8 @@ static const luaL_Reg tab_funcs[] = {
   {"remove", tremove},
   {"move", tmove},
   {"sort", sort},
+  /* Iasy */
+  {"filter",tfilter},
   {NULL, NULL}
 };
 
