@@ -97,6 +97,82 @@ static int tfilter (lua_State *L) {
 
 //----------------------------------------------------------------------------------------------------------------------//
 
+static int tfirst (lua_State *L) {
+    const int iterable = 1;
+    const int comparator = 2;
+
+    // let's bypass metatable index
+    lua_len(L, iterable);
+    const int length = lua_tointeger(L, -1);
+    lua_pop(L, 1); 
+
+    for (int i = 1; i <= length; i++) {
+        const int value = -2;
+
+        // let's take the argument
+        lua_rawgeti(L, iterable, i);
+
+        // So we call the comparator function
+        lua_pushvalue(L, comparator);
+        lua_pushvalue(L, value);
+        lua_call(L, 1, 1);
+
+        // The comparator validates the value?
+        if (lua_toboolean(L, -1)==1) {
+            // Let's return the value and index
+            lua_pushvalue(L, value);
+            lua_pushinteger(L,i);
+            return 2;
+        }
+
+        lua_pop(L, 2); // Clear the stack
+    }
+
+    // None of elements matches
+    lua_pushnil(L);
+    return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+static int tlast (lua_State *L) {
+    const int iterable = 1;
+    const int comparator = 2;
+
+    // let's bypass metatable index
+    lua_len(L, iterable);
+    const int length = lua_tointeger(L, -1);
+    lua_pop(L, 1); 
+
+    for (int i = length; i >= 1; i--) {
+        const int value = -2;
+
+        // let's take the argument
+        lua_rawgeti(L, iterable, i);
+
+        // So we call the comparator function
+        lua_pushvalue(L, comparator);
+        lua_pushvalue(L, value);
+        lua_call(L, 1, 1);
+
+        // The comparator validates the value?
+        if (lua_toboolean(L, -1)==1) {
+            // Let's return the value and index
+            lua_pushvalue(L, value);
+            lua_pushinteger(L,i);
+            return 2;
+        }
+
+        lua_pop(L, 2); // Clear the stack
+    }
+
+    // None of elements matches
+    lua_pushnil(L);
+    return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
 static int tinsert (lua_State *L) {
   lua_Integer pos;  /* where to insert new element */
   lua_Integer e = aux_getn(L, 1, TAB_RW);
@@ -460,6 +536,8 @@ static const luaL_Reg tab_funcs[] = {
   {"sort", sort},
   /* Iasy */
   {"filter",tfilter},
+  {"first",tfirst},
+  {"last",tlast},
   {NULL, NULL}
 };
 
