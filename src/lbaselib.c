@@ -461,6 +461,95 @@ int luaB_apply (lua_State *L) {
 }
 
 //----------------------------------------------------------------------------------------------------------------------//
+
+int luaB_safe_closure(lua_State *L) {
+    lua_pushvalue(L, lua_upvalueindex(1));
+    lua_insert(L, -lua_gettop(L));
+
+    // Let's securelly run the function
+    if (lua_pcall(L,lua_gettop(L)-1,LUA_MULTRET,0) != 0) {
+      // We get a error, lets put the error handler on stack
+      lua_pushvalue(L, lua_upvalueindex(3));
+
+      // Is a function? Run
+      if (lua_isfunction(L,lua_gettop(L))) {
+        lua_insert(L, -lua_gettop(L));
+        lua_pcall(L,lua_gettop(L)-1,LUA_MULTRET,0);
+        return lua_gettop(L);
+      }
+
+      // Is nil? Return error
+      if (lua_isnil(L,lua_gettop(L))) {
+        lua_pop(L,1);
+        return lua_gettop(L);
+      }
+
+      // Return the fallback value
+      lua_insert(L, -lua_gettop(L));
+      lua_pop(L,1);
+      return lua_gettop(L);
+    }
+
+    // No errors, let's put "ok" handler on stack
+    lua_pushvalue(L, lua_upvalueindex(2));
+
+    // Handler is a function? lets call it with returned values as arguments
+    if (lua_isfunction(L,lua_gettop(L))) {
+      lua_insert(L, -lua_gettop(L));
+      lua_pcall(L,lua_gettop(L)-1,LUA_MULTRET,0);
+      return lua_gettop(L);
+    }
+
+    // No ok handler, let's return value as a normal function
+    if (lua_isnil(L,lua_gettop(L))) {
+        lua_pop(L,1);
+        return lua_gettop(L);
+    }
+
+    // let's return the handler
+    lua_insert(L, -lua_gettop(L));
+    lua_pop(L,lua_gettop(L)-1);
+    return lua_gettop(L);
+}
+
+
+int luaB_safe_table_closure(lua_State *L) {
+    const int descriptor = 1;
+
+    lua_pushvalue(L, lua_upvalueindex(1));
+
+    luaL_checktype(L, descriptor, LUA_TTABLE);
+    lua_pushvalue(L, descriptor);
+
+    lua_pushstring(L,"ok");
+    lua_rawget(L,descriptor);
+
+    lua_pushstring(L,"error");
+    lua_rawget(L,descriptor);
+
+    // We don't want safe function on stack
+    lua_remove(L,1);
+    // We don't need descriptor table anymore
+    lua_remove(L,2);
+
+    // Push the closure that does the trick
+    lua_pushcclosure(L, luaB_safe_closure, 3);
+    return 1;
+}
+
+int luaB_safe (lua_State *L) {
+  const int fn = 1; 
+  // Only pass if fn is a function
+  luaL_checktype(L, fn, LUA_TFUNCTION);
+  // fn as local
+  lua_pushvalue(L, fn);
+  // Push the handlers closure
+  lua_pushcclosure(L, luaB_safe_table_closure, 1);
+  return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
 static int luaB_print (lua_State *L) {
   int n = lua_gettop(L);  /* number of arguments */
   int i;
@@ -996,6 +1085,7 @@ static const luaL_Reg base_funcs[] = {
   {"any",luaB_any},
   {"same",luaB_same},
   {"apply",luaB_apply},
+  {"safe",luaB_safe},
   /* placeholders */
   {LUA_GNAME, NULL},
   {"_VERSION", NULL},
