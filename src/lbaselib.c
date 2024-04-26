@@ -428,6 +428,39 @@ int luaB_same(lua_State *L) {
 
 //----------------------------------------------------------------------------------------------------------------------//
 
+int luaB_apply_closure(lua_State *L) {
+    const int properties = 1;
+    const int obj = 2;
+
+    lua_pushvalue(L, lua_upvalueindex(1));
+
+    luaL_checktype(L, properties, LUA_TTABLE);
+
+    lua_pushnil(L);  // Push nil to start the iteration
+    while (lua_next(L, properties) != 0) {
+
+        lua_pushvalue(L, -2);  // Push the key
+        lua_pushvalue(L, -2);  // Push the value
+        lua_settable(L, obj);  // Set obj[key] = value
+
+        lua_pop(L, 1);
+    }
+
+    return 0;
+}
+
+int luaB_apply (lua_State *L) {
+  const int obj = 1; 
+  // Only pass if base is a table
+  luaL_checktype(L, obj, LUA_TTABLE);
+  // obj as local
+  lua_pushvalue(L, obj);
+  // Push the closure that does the trick
+  lua_pushcclosure(L, luaB_apply_closure, 1);
+  return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
 static int luaB_print (lua_State *L) {
   int n = lua_gettop(L);  /* number of arguments */
   int i;
@@ -962,6 +995,7 @@ static const luaL_Reg base_funcs[] = {
   {"none",luaB_none},
   {"any",luaB_any},
   {"same",luaB_same},
+  {"apply",luaB_apply},
   /* placeholders */
   {LUA_GNAME, NULL},
   {"_VERSION", NULL},
