@@ -250,6 +250,306 @@ int luaB_extends(lua_State *L) {
 
 //----------------------------------------------------------------------------------------------------------------------//
 
+int luaB_all(lua_State *L) {
+    const int iterable = 1;
+
+    // Only pass if arg is table
+    luaL_checktype(L, iterable, LUA_TTABLE);
+
+    lua_len(L, iterable); // Get the length of the table
+    int n = lua_tointeger(L, -1); // Get the length
+    lua_pop(L, 1); // Pop the length from the stack
+
+    // Has elements?
+    if (n == 0) {
+        // No? So put false
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+
+    for (int i = 1; i <= n; ++i) {
+        const int value = -1;
+        lua_rawgeti(L, iterable, i); // Get the i-th element of the table
+        if (lua_toboolean(L, value) == 0) { // Check if the element is false
+            // Return false and the index
+            lua_pushboolean(L, 0);
+            lua_pushinteger(L, i);
+            return 2;
+        }
+        lua_pop(L, 1); // Pop the element from the stack
+    }
+
+    lua_pushboolean(L, 1); // Push true onto the stack
+    return 1; // Return true
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+int luaB_none(lua_State *L) {
+    const int iterable = 1;
+
+    // Only pass if arg is table
+    luaL_checktype(L, iterable, LUA_TTABLE);
+
+    lua_len(L, iterable); // Get the length of the table
+    int n = lua_tointeger(L, -1); // Get the length
+    lua_pop(L, 1); // Pop the length from the stack
+
+    // Has elements?
+    if (n == 0) {
+        // No? So put true
+        lua_pushboolean(L, 1);
+        return 1;
+    }
+
+    for (int i = 1; i <= n; ++i) {
+        const int value = -1;
+        lua_rawgeti(L, iterable, i); // Get the i-th element of the table
+        if (lua_toboolean(L, value) == 1) { // Check if the element is false
+            // Return false and the index
+            lua_pushboolean(L, 0);
+            lua_pushinteger(L, i);
+            return 2;
+        }
+        lua_pop(L, 1); // Pop the element from the stack
+    }
+
+    lua_pushboolean(L, 1); // Push true onto the stack
+    return 1; // Return true
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+int luaB_any(lua_State *L) {
+    const int iterable = 1;
+
+    // Only pass if arg is table
+    luaL_checktype(L, iterable, LUA_TTABLE);
+
+    lua_len(L, iterable); // Get the length of the table
+    int n = lua_tointeger(L, -1); // Get the length
+    lua_pop(L, 1); // Pop the length from the stack
+
+    for (int i = 1; i <= n; ++i) {
+        const int value = -1;
+        lua_rawgeti(L, iterable, i); // Get the i-th element of the table
+        if (lua_toboolean(L, value) == 1) { // Check if the element is truthy
+            // Return true and the index
+            lua_pushboolean(L, 1);
+            lua_pushinteger(L, i);
+            return 2;
+        }
+        lua_pop(L, 1); // Pop the element from the stack
+    }
+
+    lua_pushboolean(L, 0); // Push false onto the stack
+    return 1; // Return true
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+int luaB_same(lua_State *L) {
+    const int iterable = 1;
+    // Iterable must be a table
+    luaL_checktype(L, iterable, LUA_TTABLE);
+
+    // Get the length of the table
+    int len = luaL_len(L, iterable);
+
+    // Return false if table is empty
+    if (len == 0) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+
+    // Get the type of the first element in the table
+    lua_rawgeti(L, iterable, 1);
+    char *firstType = (char *)luaL_typename(L, -1);
+
+    // If type of first element is "table", check if it has a metatable
+    if (strcmp(firstType, "table") == 0) {
+        const int metatable = -1;
+        // Get metatable of the table
+        if (lua_getmetatable(L, metatable)) { 
+            firstType = "object"; // Ok, is at least an object (has a metatable)
+            if (lua_istable(L, metatable)) {
+                const int name = -1;
+                // We are have a custom type here?
+                lua_getfield(L, metatable, "__name");
+                if (lua_isstring(L, name)) { 
+                    firstType = (char *)lua_tostring(L, name); // Yes, lets store the custom type
+                }
+                lua_pop(L, 1); // Pop the "__name" field
+            }
+            lua_pop(L, 1); // Pop the metatable
+        }
+    }
+
+    lua_pop(L, 1); // Pop the first element from the stack
+
+    for (int i = 2; i <= len; i++) {
+        const int value = -1;
+        lua_rawgeti(L, iterable, i); // Get the next element
+
+        char *valueType = (char *)luaL_typename(L, value); // Get its type
+
+        // If type of current element is "table", check if it has a metatable
+        if (strcmp(valueType, "table") == 0) {
+            const int metatable = -1;
+            // Get metatable of the table
+            if (lua_getmetatable(L, metatable)) { 
+                valueType = "object"; // Ok, is at least an object (has a metatable)
+                if (lua_istable(L, metatable)) {
+                    const int name = -1;
+                    // We have a custom type here?
+                    lua_getfield(L, metatable, "__name");
+                    if (lua_isstring(L, name)) { 
+                        valueType = (char *)lua_tostring(L, name); // Yes, lets store the custom type
+                    }
+                    lua_pop(L, 1); // Pop the "__name" field
+                }
+                lua_pop(L, 1); // Pop the metatable
+            }
+        }
+
+        // Chech if types are different
+        if (strcmp(valueType, firstType) != 0) {
+            // Return true and the index
+            lua_pushboolean(L, 0);
+            lua_pushinteger(L, i);
+            return 2;
+        }
+        lua_pop(L, 1); // Pop the element from the stack
+    }
+
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+int luaB_apply_closure(lua_State *L) {
+    const int properties = 1;
+    const int obj = 2;
+
+    lua_pushvalue(L, lua_upvalueindex(1));
+
+    luaL_checktype(L, properties, LUA_TTABLE);
+
+    lua_pushnil(L);  // Push nil to start the iteration
+    while (lua_next(L, properties) != 0) {
+
+        lua_pushvalue(L, -2);  // Push the key
+        lua_pushvalue(L, -2);  // Push the value
+        lua_settable(L, obj);  // Set obj[key] = value
+
+        lua_pop(L, 1);
+    }
+
+    return 0;
+}
+
+int luaB_apply (lua_State *L) {
+  const int obj = 1; 
+  // Only pass if base is a table
+  luaL_checktype(L, obj, LUA_TTABLE);
+  // obj as local
+  lua_pushvalue(L, obj);
+  // Push the closure that does the trick
+  lua_pushcclosure(L, luaB_apply_closure, 1);
+  return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+int luaB_safe_closure(lua_State *L) {
+    lua_pushvalue(L, lua_upvalueindex(1));
+    lua_insert(L, -lua_gettop(L));
+
+    // Let's securelly run the function
+    if (lua_pcall(L,lua_gettop(L)-1,LUA_MULTRET,0) != 0) {
+      // We get a error, lets put the error handler on stack
+      lua_pushvalue(L, lua_upvalueindex(3));
+
+      // Is a function? Run
+      if (lua_isfunction(L,lua_gettop(L))) {
+        lua_insert(L, -lua_gettop(L));
+        lua_pcall(L,lua_gettop(L)-1,LUA_MULTRET,0);
+        return lua_gettop(L);
+      }
+
+      // Is nil? Return error
+      if (lua_isnil(L,lua_gettop(L))) {
+        lua_pop(L,1);
+        return lua_gettop(L);
+      }
+
+      // Return the fallback value
+      lua_insert(L, -lua_gettop(L));
+      lua_pop(L,1);
+      return lua_gettop(L);
+    }
+
+    // No errors, let's put "ok" handler on stack
+    lua_pushvalue(L, lua_upvalueindex(2));
+
+    // Handler is a function? lets call it with returned values as arguments
+    if (lua_isfunction(L,lua_gettop(L))) {
+      lua_insert(L, -lua_gettop(L));
+      lua_pcall(L,lua_gettop(L)-1,LUA_MULTRET,0);
+      return lua_gettop(L);
+    }
+
+    // No ok handler, let's return value as a normal function
+    if (lua_isnil(L,lua_gettop(L))) {
+        lua_pop(L,1);
+        return lua_gettop(L);
+    }
+
+    // let's return the handler
+    lua_insert(L, -lua_gettop(L));
+    lua_pop(L,lua_gettop(L)-1);
+    return lua_gettop(L);
+}
+
+
+int luaB_safe_table_closure(lua_State *L) {
+    const int descriptor = 1;
+
+    lua_pushvalue(L, lua_upvalueindex(1));
+
+    luaL_checktype(L, descriptor, LUA_TTABLE);
+    lua_pushvalue(L, descriptor);
+
+    lua_pushstring(L,"ok");
+    lua_rawget(L,descriptor);
+
+    lua_pushstring(L,"error");
+    lua_rawget(L,descriptor);
+
+    // We don't want safe function on stack
+    lua_remove(L,1);
+    // We don't need descriptor table anymore
+    lua_remove(L,2);
+
+    // Push the closure that does the trick
+    lua_pushcclosure(L, luaB_safe_closure, 3);
+    return 1;
+}
+
+int luaB_safe (lua_State *L) {
+  const int fn = 1; 
+  // Only pass if fn is a function
+  luaL_checktype(L, fn, LUA_TFUNCTION);
+  // fn as local
+  lua_pushvalue(L, fn);
+  // Push the handlers closure
+  lua_pushcclosure(L, luaB_safe_table_closure, 1);
+  return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
 static int luaB_print (lua_State *L) {
   int n = lua_gettop(L);  /* number of arguments */
   int i;
@@ -780,6 +1080,12 @@ static const luaL_Reg base_funcs[] = {
   /* Iasy */
   {"new", luaB_new},
   {"extends", luaB_extends},
+  {"all",luaB_all},
+  {"none",luaB_none},
+  {"any",luaB_any},
+  {"same",luaB_same},
+  {"apply",luaB_apply},
+  {"safe",luaB_safe},
   /* placeholders */
   {LUA_GNAME, NULL},
   {"_VERSION", NULL},
