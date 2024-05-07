@@ -95,6 +95,8 @@ static int tfilter (lua_State *L) {
     return 1; // Return the result table
 }
 
+
+
 //----------------------------------------------------------------------------------------------------------------------//
 
 static int tfirst (lua_State *L) {
@@ -197,6 +199,36 @@ static int treverse (lua_State *L) {
     }
 
     return 1; // Return the result table
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+static int tcontains(lua_State *L) {
+    const int tbl = 1;
+    const int reference = 2;
+
+    // Check if the argument passed is a table
+    luaL_checktype(L, tbl, LUA_TTABLE);
+
+    // Iterate over the table
+    lua_pushnil(L);  // Push nil to start the iteration
+    while (lua_next(L, tbl)) {
+        // Stack: table, key, value
+
+        // Check if the current value is equal to the reference
+        if (lua_equal(L, -1, reference)) {
+            lua_pop(L, 2); // Pop key and value from the stack
+            lua_pushboolean(L, 1); // Push true onto the stack
+            return 1; // Return true
+        }
+
+        // Stack: table, key, value
+        lua_pop(L, 1); // Pop the value, leaving the key on top for the next iteration
+        // Stack: table, key
+    }
+
+    lua_pushboolean(L, 0); // If we reach here, the reference wasn't found, so push false
+    return 1; // Return false
 }
 
 //----------------------------------------------------------------------------------------------------------------------//
@@ -567,6 +599,7 @@ static const luaL_Reg tab_funcs[] = {
   {"first",tfirst},
   {"last",tlast},
   {"reverse",treverse},
+  {"contains",tcontains},
   {NULL, NULL}
 };
 
