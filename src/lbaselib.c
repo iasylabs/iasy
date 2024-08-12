@@ -616,9 +616,30 @@ static int luaB_tonumber (lua_State *L) {
     else {
       size_t l;
       const char *s = lua_tolstring(L, 1, &l);
-      if (s != NULL && lua_stringtonumber(L, s) == l + 1)
-        return 1;  /* successful conversion to number */
-      /* else not a number */
+      if (s != NULL) {
+        // Allocate buffer for modified string
+        char *buf = (char *)malloc(l + 1);
+        if (buf == NULL) {
+          luaL_error(L, "memory allocation error"); // handle memory allocation error
+          return 0;
+        }
+
+        // Copy string excluding underscores
+        size_t j = 0;
+        for (size_t i = 0; i < l; ++i) {
+          if (s[i] != '_') {
+            buf[j++] = s[i];
+          }
+        }
+        buf[j] = '\0';  // Null-terminate the modified string
+
+        if (lua_stringtonumber(L, buf) == j + 1) {
+          free(buf);  // free allocated memory
+          return 1;   // successful conversion to number
+        }
+
+        free(buf);  // free allocated memory
+      }
       luaL_checkany(L, 1);  /* (but there must be some parameter) */
     }
   }
@@ -629,12 +650,33 @@ static int luaB_tonumber (lua_State *L) {
     lua_Integer base = luaL_checkinteger(L, 2);
     luaL_checktype(L, 1, LUA_TSTRING);  /* no numbers as strings */
     s = lua_tolstring(L, 1, &l);
+
+    // Allocate buffer for modified string
+    char *buf = (char *)malloc(l + 1);
+    if (buf == NULL) {
+      luaL_error(L, "memory allocation error"); // handle memory allocation error
+      return 0;
+    }
+
+    // Copy string excluding underscores
+    size_t j = 0;
+    for (size_t i = 0; i < l; ++i) {
+      if (s[i] != '_') {
+        buf[j++] = s[i];
+      }
+    }
+    buf[j] = '\0';  // Null-terminate the modified string
+
     luaL_argcheck(L, 2 <= base && base <= 36, 2, "base out of range");
-    if (b_str2int(s, (int)base, &n) == s + l) {
+    if (b_str2int(buf, (int)base, &n) == buf + j) {
+      free(buf);  // free allocated memory
       lua_pushinteger(L, n);
       return 1;
-    }  /* else not a number */
-  }  /* else not a number */
+    }
+
+    free(buf);  // free allocated memory
+  }
+  
   luaL_pushfail(L);  /* not a number */
   return 1;
 }
