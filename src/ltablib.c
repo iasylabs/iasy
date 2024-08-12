@@ -95,7 +95,48 @@ static int tfilter (lua_State *L) {
     return 1; // Return the result table
 }
 
+//----------------------------------------------------------------------------------------------------------------------//
 
+static int tenumerate(lua_State *L) {
+    // Check the arguments
+    luaL_checktype(L, 1, LUA_TTABLE); // Ensure first argument is a table
+    int start = luaL_optinteger(L, 2, 1); // Second argument as integer, default to 1
+
+    // Create a new table to store results
+    lua_newtable(L);
+
+    // Iterate over the input table
+    lua_pushnil(L); // First key
+    while (lua_next(L, 1) != 0) {
+        // Stack: key at index -2, value at index -1
+        const int key = -2;
+        const int value = -3;
+        // Get key from the original table
+        lua_pushvalue(L, key); // Duplicate the key
+
+        // Create a new table for the pair {start, value}
+        lua_newtable(L);
+
+        // Add start to the new table
+        lua_pushinteger(L, start);
+        lua_rawseti(L, -2, 1);
+
+        // Add value to the new table
+        lua_pushvalue(L, value); // Duplicate the value
+        lua_rawseti(L, -2, 2);
+
+        // Set this new table into the result table
+        lua_rawset(L, -5);
+
+        // Clean up stack: remove key, leave value for the next iteration
+        lua_pop(L, 1);
+
+        // Increment the start value
+        start++;
+    }
+
+    return 1; // Return the result table
+}
 
 //----------------------------------------------------------------------------------------------------------------------//
 
@@ -600,6 +641,7 @@ static const luaL_Reg tab_funcs[] = {
   {"last",tlast},
   {"reverse",treverse},
   {"contains",tcontains},
+  {"enumerate",tenumerate},
   {NULL, NULL}
 };
 
