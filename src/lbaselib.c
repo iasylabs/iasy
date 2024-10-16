@@ -550,6 +550,39 @@ int luaB_safe (lua_State *L) {
 
 //----------------------------------------------------------------------------------------------------------------------//
 
+int luaB_polymorphic_closure(lua_State *L) {
+    int table = 1;
+    int argsCount = lua_gettop(L);
+    int function = -1;
+
+    lua_pushinteger(L, argsCount);
+    lua_gettable(L, lua_upvalueindex(table));
+
+    if (lua_isnil(L, function)) {
+        lua_pop(L, 1);
+        lua_getfield(L, lua_upvalueindex(table), "default");
+    }
+
+    if (lua_isnil(L, function)) {
+        return luaL_error(L, "unable to find a function that accept this number of args");
+    }
+
+    lua_insert(L, 1);
+    lua_call(L, argsCount, LUA_MULTRET);
+    return lua_gettop(L);
+}
+
+
+int luaB_polymorphic(lua_State *L) {
+    int table = 1;
+    luaL_checktype(L, table, LUA_TTABLE);
+    lua_pushcclosure(L, luaB_polymorphic_closure, 1);
+    return 1;
+}
+
+
+//----------------------------------------------------------------------------------------------------------------------//
+
 static int luaB_print (lua_State *L) {
   int n = lua_gettop(L);  /* number of arguments */
   int i;
@@ -1128,6 +1161,7 @@ static const luaL_Reg base_funcs[] = {
   {"same",luaB_same},
   {"apply",luaB_apply},
   {"safe",luaB_safe},
+  {"polymorphic",luaB_polymorphic},
   /* placeholders */
   {LUA_GNAME, NULL},
   {"_VERSION", NULL},
