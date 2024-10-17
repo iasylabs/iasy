@@ -57,6 +57,222 @@ static void checktab (lua_State *L, int arg, int what) {
   }
 }
 
+//----------------------------------------------------------------------------------------------------------------------//
+
+static int tfilter (lua_State *L) {
+    const int iterable = 1;
+    const int comparator = 2;
+    const int result_table = 3;
+  
+    lua_newtable(L); 
+
+    // let's bypass metatable index
+    lua_len(L, iterable);
+    const int length = lua_tointeger(L, -1);
+    lua_pop(L, 1); 
+
+    for (int i = 1; i <= length; i++) {
+        const int value = -2;
+
+        // let's take the argument
+        lua_rawgeti(L, iterable, i);
+
+        // So we call the comparator function
+        lua_pushvalue(L, comparator);
+        lua_pushvalue(L, value);
+        lua_call(L, 1, 1);
+
+        // The comparator validates the value?
+        if (lua_toboolean(L, -1)==1) {
+            // Let's put them into result table
+            lua_pushvalue(L, value);
+            lua_rawseti(L, result_table, luaL_len(L, result_table) + 1);
+        }
+
+        lua_pop(L, 2); // Clear the stack
+    }
+
+    return 1; // Return the result table
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+static int tenumerate(lua_State *L) {
+    // Check the arguments
+    luaL_checktype(L, 1, LUA_TTABLE); // Ensure first argument is a table
+    int start = luaL_optinteger(L, 2, 1); // Second argument as integer, default to 1
+
+    // Create a new table to store results
+    lua_newtable(L);
+
+    // Iterate over the input table
+    lua_pushnil(L); // First key
+    while (lua_next(L, 1) != 0) {
+        // Stack: key at index -2, value at index -1
+        const int key = -2;
+        const int value = -3;
+        // Get key from the original table
+        lua_pushvalue(L, key); // Duplicate the key
+
+        // Create a new table for the pair {start, value}
+        lua_newtable(L);
+
+        // Add start to the new table
+        lua_pushinteger(L, start);
+        lua_rawseti(L, -2, 1);
+
+        // Add value to the new table
+        lua_pushvalue(L, value); // Duplicate the value
+        lua_rawseti(L, -2, 2);
+
+        // Set this new table into the result table
+        lua_rawset(L, -5);
+
+        // Clean up stack: remove key, leave value for the next iteration
+        lua_pop(L, 1);
+
+        // Increment the start value
+        start++;
+    }
+
+    return 1; // Return the result table
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+static int tfirst (lua_State *L) {
+    const int iterable = 1;
+    const int comparator = 2;
+
+    // let's bypass metatable index
+    lua_len(L, iterable);
+    const int length = lua_tointeger(L, -1);
+    lua_pop(L, 1); 
+
+    for (int i = 1; i <= length; i++) {
+        const int value = -2;
+
+        // let's take the argument
+        lua_rawgeti(L, iterable, i);
+
+        // So we call the comparator function
+        lua_pushvalue(L, comparator);
+        lua_pushvalue(L, value);
+        lua_call(L, 1, 1);
+
+        // The comparator validates the value?
+        if (lua_toboolean(L, -1)==1) {
+            // Let's return the value and index
+            lua_pushvalue(L, value);
+            lua_pushinteger(L,i);
+            return 2;
+        }
+
+        lua_pop(L, 2); // Clear the stack
+    }
+
+    // None of elements matches
+    lua_pushnil(L);
+    return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+static int tlast (lua_State *L) {
+    const int iterable = 1;
+    const int comparator = 2;
+
+    // let's bypass metatable index
+    lua_len(L, iterable);
+    const int length = lua_tointeger(L, -1);
+    lua_pop(L, 1); 
+
+    for (int i = length; i >= 1; i--) {
+        const int value = -2;
+
+        // let's take the argument
+        lua_rawgeti(L, iterable, i);
+
+        // So we call the comparator function
+        lua_pushvalue(L, comparator);
+        lua_pushvalue(L, value);
+        lua_call(L, 1, 1);
+
+        // The comparator validates the value?
+        if (lua_toboolean(L, -1)==1) {
+            // Let's return the value and index
+            lua_pushvalue(L, value);
+            lua_pushinteger(L,i);
+            return 2;
+        }
+
+        lua_pop(L, 2); // Clear the stack
+    }
+
+    // None of elements matches
+    lua_pushnil(L);
+    return 1;
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+static int treverse (lua_State *L) {
+    const int iterable = 1;
+    const int result_table = 2;
+  
+    lua_newtable(L); 
+
+    // let's bypass metatable index
+    lua_len(L, iterable);
+    const int length = lua_tointeger(L, -1);
+    lua_pop(L, 1); 
+
+    for (int i = length; i >= 1; i--) {
+        const int value = -1;
+
+        // let's take the argument
+        lua_rawgeti(L, iterable, i);
+
+        lua_pushvalue(L, value);
+        lua_rawseti(L, result_table, luaL_len(L, result_table) + 1);
+
+        lua_pop(L, 1); // Clear the stack
+    }
+
+    return 1; // Return the result table
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
+
+static int tcontains(lua_State *L) {
+    const int tbl = 1;
+    const int reference = 2;
+
+    // Check if the argument passed is a table
+    luaL_checktype(L, tbl, LUA_TTABLE);
+
+    // Iterate over the table
+    lua_pushnil(L);  // Push nil to start the iteration
+    while (lua_next(L, tbl)) {
+        // Stack: table, key, value
+
+        // Check if the current value is equal to the reference
+        if (lua_equal(L, -1, reference)) {
+            lua_pop(L, 2); // Pop key and value from the stack
+            lua_pushboolean(L, 1); // Push true onto the stack
+            return 1; // Return true
+        }
+
+        // Stack: table, key, value
+        lua_pop(L, 1); // Pop the value, leaving the key on top for the next iteration
+        // Stack: table, key
+    }
+
+    lua_pushboolean(L, 0); // If we reach here, the reference wasn't found, so push false
+    return 1; // Return false
+}
+
+//----------------------------------------------------------------------------------------------------------------------//
 
 static int tinsert (lua_State *L) {
   lua_Integer pos;  /* where to insert new element */
@@ -419,6 +635,13 @@ static const luaL_Reg tab_funcs[] = {
   {"remove", tremove},
   {"move", tmove},
   {"sort", sort},
+  /* Iasy */
+  {"filter",tfilter},
+  {"first",tfirst},
+  {"last",tlast},
+  {"reverse",treverse},
+  {"contains",tcontains},
+  {"enumerate",tenumerate},
   {NULL, NULL}
 };
 

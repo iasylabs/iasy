@@ -759,6 +759,15 @@ LUAMOD_API int luaopen_math (lua_State *L) {
   lua_pushinteger(L, LUA_MININTEGER);
   lua_setfield(L, -2, "mininteger");
   setrandfunc(L);
+
+  // debug.lua_setmetatable(42,{__index = math})
+  lua_pushnumber(L, 42);          // Push 42 on the stack
+  lua_newtable(L);                // Create a new table (metatable)
+  lua_pushvalue(L, -3);           // Copy math library on top of the stack
+  lua_setfield(L, -2, "__index"); // Set __index field of the metatable as math library for number type
+  lua_setmetatable(L, -2);        // Set the metatable for 42
+
+  lua_pushvalue(L, -2); // Copy math library on top of the stack again
   return 1;
 }
 
